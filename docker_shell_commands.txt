@@ -1,10 +1,14 @@
+# aws install docker
+sudo amazon-linux-extras install docker 
+sudo service docker start
+sudo usermod -a -G docker ec2-user
 
-# build and run
+# aws build and run
 sudo service docker start
 sudo docker build -t archtp .
 sudo docker run -p 8050:8050 -v ~/archtp_dash/volume:/data archtp
 
-#restart and run
+#aws restart and run
 sudo service docker start
 sudo docker run -p 8050:8050 -v ~/archtp_dash/volume:/data archtp
 
