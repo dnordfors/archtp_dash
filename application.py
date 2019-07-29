@@ -985,13 +985,13 @@ app.layout = html.Div(
                 dcc.Graph(
                     id='example-graph'
                 )
-            ]),
+            ])
             #], className = 'row'),
-        html.Div([
-            dcc.Graph(
-                id='example-graph-2'
-            )
-        ],  className = "row")
+        # html.Div([
+        #     dcc.Graph(
+        #         id='example-graph-2'
+        #     )
+        # ],  className = "row")
     ], className = "row")
     ], className='twelve columns')
 )
