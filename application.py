@@ -17,9 +17,9 @@ import collections
 from sklearn.model_selection import train_test_split
 from sklearn.model_selection import cross_validate
 from sklearn.model_selection import cross_val_score
-from sklearn import linear_model
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.ensemble import GradientBoostingRegressor
+#from sklearn import linear_model
+#from sklearn.ensemble import RandomForestRegressor
+#from sklearn.ensemble import GradientBoostingRegressor
 import xgboost as xgb
 
 from sklearn.metrics import r2_score
@@ -44,7 +44,7 @@ import plotly.figure_factory as ff
 from IPython.display import display, Markdown, Latex
 
     ### Apps & Widgets
-import ipywidgets as widgets
+#import ipywidgets as widgets
 
 import dash
 import dash_core_components as dcc
@@ -84,11 +84,7 @@ def download_url(url, output_path):
 ## CREATE PATHS / DIRECTORIES 
 
 # path to home directory (the location of this file)
-#path0 = !pwd
-#path = path0.n
-
 path = os.path.curdir
-
 os.chdir(path)
 
 #Check if directories exist - creat directories if needed
@@ -103,7 +99,7 @@ paths['onet'] = paths['data'] + '/onet'
 
 ## GENERAL FUNCTIONS 
 ### NORMALIZATION
-# Statistic normalization - subtract mean, scale by standard deviation
+#### Statistic normalization - subtract mean, scale by standard deviation
 def norm_stat(vec, weights = False):
     '''
     Normalizes a vector v-v.mean())/v.std() 
@@ -112,35 +108,51 @@ def norm_stat(vec, weights = False):
         return  np.mean(abs(vec - vec.mean()))  
     return (vec-vec.mean())/vec.std()
 
-# Algebraic normalization - dot product
+#### Algebraic normalization - dot product
 def norm_dot(vec, weights = False):
     '''
-    Normalizes the columns of a DataFrame (dot product)
+    Normalizes a vector - dot product: v @ v = 1
     '''
     if weights:
         return  np.sqrt(vec @ vec)
     
     return vec / np.sqrt(vec @ vec)
 
-# Algebraic normalization - dot product
+#### Algebraic normalization - dot product
 def norm_sum(vec, weights = False):
     '''
-    Normalizes the columns of a DataFrame (dot product)
+    Normalizes a vector - sum: v.sum = 1
     '''
     if weights:
         return  vec.sum()
     
     return vec / vec.sum()
 
-# 
-# Scaled Normalization -
+#### Scaled Normalization -
 def scale(vec, weights = False):
+    '''
+    Normalizes a vector: v.min = 0, v.max = 1
+    '''
     stop_divide_by_zero = 0.00000001
     if weights:
         return (vec.max()-vec.min() + stop_divide_by_zero)
     return (vec-vec.min())/(vec.max()-vec.min() + stop_divide_by_zero)
 
-
+### CLUSTERING
+def clustermap(df,orientation = 'horizontal'):
+    '''
+    Hierarchical clustering of a pandas dataframe, typically a set of archetypes ('arch', y-axis) vs features ('other', x-axis)
+    Outputs a dictionary with a heatmap and dendrograms:  {'heatmap':clustered_df,'arch_dendro': dendro_arch,'other_dendro': dendro_other}
+    '''
+    orientation_dic =  {'horizontal': {'arch' : 'right', 'other' : 'bottom'} ,
+                        'vertical'  : {'arch' : 'bottom', 'other' : 'right'}}
+    orient = orientation_dic[orientation]
+    dendro_arch = ff.create_dendrogram(df, orientation= orient['arch'], labels=df.index)
+    dendro_arch_leaves = dendro_arch['layout']['yaxis']['ticktext']
+    dendro_other = ff.create_dendrogram(df.T, orientation= orient['other'], labels=df.T.index)
+    dendro_other_leaves = dendro_other['layout']['xaxis']['ticktext']
+    clustered_df = df[dendro_other_leaves].loc[dendro_arch_leaves]
+    return {'heatmap':clustered_df,'arch_dendro': dendro_arch,'other_dendro': dendro_other}
 
 ### SELECTION 
 def is_string(a):
@@ -151,9 +163,7 @@ def is_string(a):
     '''
     return isinstance(a,str)
 
-
 ## CLASSES
-
 ### DATA DICTIONARY 
 
 class    Datadic: 
@@ -192,6 +202,26 @@ class    Datadic:
         self.census = pd.read_csv("data/census/PUMS_Data_Dictionary.csv").drop_duplicates()
         self.census_variable_definitions = self.census.groupby('RT').first()['Record Type'].to_dict()      
             
+        # Set up SOC Standard Occupational Code Taxonomy
+        soc_taxonomy_exists = os.path.isfile('data/soc_taxonomy-v2010.xls')
+        if not soc_taxonomy_exists:
+            print('*** SOC Standard Occupational Code Taxonomy is missing. Downloading from BLS...')
+            download_url('https://www.onetcenter.org/taxonomy/2010/list/2010_Occupations.xls?fmt=xls','data/soc_taxonomy-v2010.xls')
+            print('*** Complete.')
+        self.soc_taxonomy = pd.read_excel('data/soc_taxonomy-v2010.xls').iloc[3:]
+        self.soc_taxonomy.columns = ['SOC','Title','Description']
+        self.soc_taxonomy['SOC']=self.soc_taxonomy['SOC'].apply(lambda a: a.replace('-','').replace('.',''))
+        self.soc_taxonomy.set_index('SOC',inplace=True)
+        
+    #     #self.soc_titles_dic = self.soc_taxonomy.fillna('').set_index('Title').apply(lambda x: ''.join(x),axis =1).apply(lambda a: a.replace('-','').replace('.','')).to_dict()
+    #     self.soc_titles_dic = self.soc_taxonomy.set_index('Title')['SOC'].apply(lambda a: a.replace('-','').replace('.','')).to_dict()
+    #     reverse_dic = dict([[v,k] for k,v in self.soc_titles_dic.items()])
+    #     self.soc_titles_dic.update(reverse_dic)
+    # def soc_titles(self,soc):
+    #     soc = soc + (8-len(soc)) *'0'
+    #     return self.soc_titles_dic.get(soc,soc)
+
+    
     def fips(self,name_or_fipsnr):
         nn = datadic.abbrev_to_state.get(name_or_fipsnr,name_or_fipsnr)
         return self.translate_fips.get(nn)
@@ -249,6 +279,10 @@ class Onet:
         self.zip = zipfile.ZipFile(zip_file)
         self.tocdf = self.make_toc()
         self.socp_titles = self.data('Alternate Titles',socp_shave = 8)[['SOCP_shave','Title']].drop_duplicates()
+        self.titles_dic = {}
+        
+            
+
 
 
     
@@ -274,7 +308,8 @@ class Onet:
             search_string = name_contains
             selection = selection[selection['name'].apply(lambda x: search_string.lower() in x.lower())]['name']
         return selection
-         
+
+ 
     
     def data(self,label, socp_shave = 6):
         '''
@@ -336,6 +371,7 @@ class Onet:
             print('*** Complete')
         return self.matrix_dic[label,xx,yy,socp_shave,data_value,scale_name,norm][show]
     
+
        
 # Instantiate Onet() as 'onet'
 onet = Onet()            
@@ -390,7 +426,6 @@ class   Census:
         df['SOCP_shave'] = df['SOCP'].apply(lambda x: x[:socp_shave].replace('X','0') if type(x)==str else x)
         self.dataset[state_abbr] = df
         return self.dataset[state_abbr]
-
 
     # Create and execute shell command fetching state census zip-file 
     def import_from_source(self,state):
@@ -455,7 +490,6 @@ class MakeXy:
 # ## CLUSTER FEATURES INTO OCCUPATION CATEGORIES
 # ## Use non-zero matrix factorization for clustering
 # ## Use singular value decomposition first state for determining overall similarity
-
 
 class Archetypes:
     '''
@@ -559,7 +593,7 @@ class Archetypes:
         #return
         return fig.fig
 
-        
+       
 class Xfit:
     '''
     Xfit is a 'fit-as-an-object' solution:
@@ -739,7 +773,7 @@ class Xyzzy:
     '''
     
     def __init__(self,
-            state,
+            state      = 'Maine',
             state_cols = ['WAGP','WKHP'],
             fte        = {'fulltime':40,'min_hours':15,'min_fte':0}, 
             y_label    = 'fte',
@@ -768,6 +802,9 @@ class Xyzzy:
                             ]
             c1['fte'] = fte['fulltime']*c1['WAGP']/c1['WKHP']
             self.census = c1[c1['fte']>=fte['min_fte']] 
+        self.census['SOC'] = self.census['SOCP_shave'].apply(lambda a: a + (8 - len(a))*'0')
+        self.census = pd.merge(self.census,datadic.soc_taxonomy[['Title']],left_on = 'SOC',right_index=True)
+
         self.make_Xy = MakeXy(self.census,self.onet,y_label = self.y_label)
         self.X   = self.make_Xy.X
         self.y   = self.make_Xy.y
@@ -776,8 +813,9 @@ class Xyzzy:
         self.svd = Svd(self.X)
         
         self.archetypes_dic ={}
-        
-        
+ 
+
+
     def archetypes(self,n,norm=norm_dot):
         if n not in self.archetypes_dic.keys():
             self.archetypes_dic[(n,norm)] = Archetypes(self.X,n,norm=norm)
@@ -798,11 +836,11 @@ class Xyzzy:
 
 
 
-def clustermap_df(arch):
-    clusmap = arch.plot_features() # seaborn clustermap object
-    clus_ind = clusmap.dendrogram_col.data.index[clusmap.dendrogram_col.reordered_ind]
-    clus_df = clusmap.dendrogram_col.data.reindex(clus_ind) # clustermap as df
-    return clus_df
+# def clustermap_df(arch):
+#     clusmap = arch.plot_features() # seaborn clustermap object
+#     clus_ind = clusmap.dendrogram_col.data.index[clusmap.dendrogram_col.reordered_ind]
+#     clus_df = clusmap.dendrogram_col.data.reindex(clus_ind) # clustermap as df
+#     return clus_df
 
 
 
@@ -990,15 +1028,6 @@ app.layout = html.Div(
     ], className='twelve columns')
 )
 
-def clustermap(df):
-    orientation = {'arch' : 'right', 'other' : 'bottom'}
-    dendro_arch = ff.create_dendrogram(df, orientation= orientation['arch'], labels=df.index)
-    dendro_arch_leaves = dendro_arch['layout']['yaxis']['ticktext']
-    dendro_other = ff.create_dendrogram(df.T, orientation= orientation['other'], labels=df.T.index)
-    dendro_other_leaves = dendro_other['layout']['xaxis']['ticktext']
-    clustered_df = df[dendro_other_leaves].loc[dendro_arch_leaves]
-    return {'heatmap':clustered_df,'arch_dendro': dendro_arch,'other_dendro': dendro_other}
-
 
 @app.callback(
     dash.dependencies.Output('NoA', 'options'),
@@ -1006,6 +1035,8 @@ def clustermap(df):
 def set_number_of_archetypes_options(feature_set):
     return [{'label': i, 'value': i} for i in range(onet.matrix(feature_set).shape[1])]
 
+
+update_graph_src_dic = {}
 
 @app.callback(
     dash.dependencies.Output('example-graph', 'figure'),
@@ -1019,53 +1050,27 @@ def set_number_of_archetypes_options(feature_set):
      dash.dependencies.Input('norm_axis', 'value')])
 
 def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,arch_feat_norm,norm_axis):
-    df = Xyzzy(state,X_label = feature_set,socp_shave = occupations, norm = eval(feature_norm)).archetypes(n_archs)
-    if 'f' in plots:
-        dfp , ax = df.f , 1
-    if 'o' in plots:
-        dfp , ax = df.o.T , 0
+    variables = (plots,n_archs,state,feature_set,occupations,feature_norm,arch_feat_norm,norm_axis)
+    if variables not in update_graph_src_dic.keys():
+        df = Xyzzy(state,X_label = feature_set,socp_shave = occupations, norm = eval(feature_norm)).archetypes(n_archs)
+        if 'f' in plots:
+            dfp , ax = df.f , 1
+        if 'o' in plots:
+            dfp , ax = df.o.T , 0
 
-    f = clustermap(dfp)['heatmap']
-    return go.Figure(go.Heatmap( z = f.apply(eval(arch_feat_norm),axis = norm_axis).values,
-                                y = f.index,
-                                x = f.columns
-                            ),
-                layout = go.Layout(xaxis={'type': 'category'},
-                                    yaxis={'type': 'category'}
-                                    )
-                    )
-        
+        f = clustermap(dfp)['heatmap']
+        update_graph_src_dic[variables] = go.Figure(
+                                go.Heatmap( z = f.apply(eval(arch_feat_norm),axis = norm_axis).values,
+                                    y = f.index,
+                                    x = f.columns
+                                ),
+                    layout = go.Layout(xaxis={'type': 'category'},
+                                        yaxis={'type': 'category'}
+                                       )
+                        )
+            
     
- 
-# @app.callback(
-#     dash.dependencies.Output('example-graph-2', 'figure'),
-#     [dash.dependencies.Input('Cities', 'value')])
-# def update_graph_src(selector):
-#     data = []
-#     for city in selector:
-#         data.append({'x': city_data[city]['x'], 'y': city_data[city]['y'],
-#                     'type': 'line', 'name': city})
-#     figure = {
-#         'data': data,
-#         'layout': {
-#             'title': 'Graph 1',
-#             'xaxis' : dict(
-#                 title='x Axis',
-#                 titlefont=dict(
-#                 family='Courier New, monospace',
-#                 size=20,
-#                 color='#7f7f7f'
-#             )),
-#             'yaxis' : dict(
-#                 title='y Axis',
-#                 titlefont=dict(
-#                 family='Helvetica, monospace',
-#                 size=20,
-#                 color='#7f7f7f'
-#             ))
-#         }
-#     }
-    return figure
+    return update_graph_src_dic[variables]
 
 
 
@@ -1075,3 +1080,7 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
 if __name__ == '__main__':
     app.run_server(host="0.0.0.0", debug=True)
 
+# if __name__ == '__main__':
+#     from wsgiref.simple_server import make_server
+#     srv = make_server('localhost', 8080, app)
+#     srv.serve_forever()
