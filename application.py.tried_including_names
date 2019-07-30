@@ -1,3 +1,4 @@
+
 #%%
 # IMPORT LIBRARIES
 
@@ -191,8 +192,6 @@ class    Datadic:
         self.abbrev_to_state = {v: k for k, v in self.state_to_abbrev.items()}
         self.translate_state_abbrev = {**self.state_to_abbrev,**self.abbrev_to_state}
         
-        
-        
         #Set up CENSUS/ACS PUMS DATA DICTIONARY
         pums_datadic_exists = os.path.isfile('./data/census/PUMS_Data_Dictionary.csv')
         if not pums_datadic_exists:
@@ -203,6 +202,26 @@ class    Datadic:
         self.census = pd.read_csv("data/census/PUMS_Data_Dictionary.csv").drop_duplicates()
         self.census_variable_definitions = self.census.groupby('RT').first()['Record Type'].to_dict()      
             
+        # Set up SOC Standard Occupational Code Taxonomy
+        soc_taxonomy_exists = os.path.isfile('data/soc_taxonomy-v2010.xls')
+        if not soc_taxonomy_exists:
+            print('*** SOC Standard Occupational Code Taxonomy is missing. Downloading from BLS...')
+            download_url('https://www.onetcenter.org/taxonomy/2010/list/2010_Occupations.xls?fmt=xls','data/soc_taxonomy-v2010.xls')
+            print('*** Complete.')
+        self.soc_taxonomy = pd.read_excel('data/soc_taxonomy-v2010.xls').iloc[3:]
+        self.soc_taxonomy.columns = ['SOC','Title','Description']
+        self.soc_taxonomy['SOC']=self.soc_taxonomy['SOC'].apply(lambda a: a.replace('-','').replace('.',''))
+        self.soc_taxonomy.set_index('SOC',inplace=True)
+        
+    #     #self.soc_titles_dic = self.soc_taxonomy.fillna('').set_index('Title').apply(lambda x: ''.join(x),axis =1).apply(lambda a: a.replace('-','').replace('.','')).to_dict()
+    #     self.soc_titles_dic = self.soc_taxonomy.set_index('Title')['SOC'].apply(lambda a: a.replace('-','').replace('.','')).to_dict()
+    #     reverse_dic = dict([[v,k] for k,v in self.soc_titles_dic.items()])
+    #     self.soc_titles_dic.update(reverse_dic)
+    # def soc_titles(self,soc):
+    #     soc = soc + (8-len(soc)) *'0'
+    #     return self.soc_titles_dic.get(soc,soc)
+
+    
     def fips(self,name_or_fipsnr):
         nn = datadic.abbrev_to_state.get(name_or_fipsnr,name_or_fipsnr)
         return self.translate_fips.get(nn)
@@ -260,6 +279,10 @@ class Onet:
         self.zip = zipfile.ZipFile(zip_file)
         self.tocdf = self.make_toc()
         self.socp_titles = self.data('Alternate Titles',socp_shave = 8)[['SOCP_shave','Title']].drop_duplicates()
+        self.titles_dic = {}
+        
+            
+
 
 
     
@@ -285,7 +308,8 @@ class Onet:
             search_string = name_contains
             selection = selection[selection['name'].apply(lambda x: search_string.lower() in x.lower())]['name']
         return selection
-         
+
+ 
     
     def data(self,label, socp_shave = 6):
         '''
@@ -403,7 +427,6 @@ class   Census:
         self.dataset[state_abbr] = df
         return self.dataset[state_abbr]
 
-
     # Create and execute shell command fetching state census zip-file 
     def import_from_source(self,state):
         '''
@@ -467,7 +490,6 @@ class MakeXy:
 # ## CLUSTER FEATURES INTO OCCUPATION CATEGORIES
 # ## Use non-zero matrix factorization for clustering
 # ## Use singular value decomposition first state for determining overall similarity
-
 
 class Archetypes:
     '''
@@ -571,7 +593,7 @@ class Archetypes:
         #return
         return fig.fig
 
-        
+       
 class Xfit:
     '''
     Xfit is a 'fit-as-an-object' solution:
@@ -780,6 +802,9 @@ class Xyzzy:
                             ]
             c1['fte'] = fte['fulltime']*c1['WAGP']/c1['WKHP']
             self.census = c1[c1['fte']>=fte['min_fte']] 
+        self.census['SOC'] = self.census['SOCP_shave'].apply(lambda a: a + (8 - len(a))*'0')
+        self.census = pd.merge(self.census,datadic.soc_taxonomy[['Title']],left_on = 'SOC',right_index=True)
+
         self.make_Xy = MakeXy(self.census,self.onet,y_label = self.y_label)
         self.X   = self.make_Xy.X
         self.y   = self.make_Xy.y
@@ -788,6 +813,7 @@ class Xyzzy:
         self.svd = Svd(self.X)
         
         self.archetypes_dic ={}
+ 
 
 
     def archetypes(self,n,norm=norm_dot):
@@ -1010,42 +1036,6 @@ def set_number_of_archetypes_options(feature_set):
     return [{'label': i, 'value': i} for i in range(onet.matrix(feature_set).shape[1])]
 
 
-# update_graph_src_dic = {}
-
-# @app.callback(
-#     dash.dependencies.Output('example-graph', 'figure'),
-#     [dash.dependencies.Input('Plots', 'value'),
-#      dash.dependencies.Input('NoA', 'value'),
-#      dash.dependencies.Input('State', 'value'),
-#      dash.dependencies.Input('Features', 'value'),
-#      dash.dependencies.Input('Occupations', 'value'),
-#      dash.dependencies.Input('feature_norm', 'value'),
-#      dash.dependencies.Input('arch_feat_norm', 'value'),
-#      dash.dependencies.Input('norm_axis', 'value')])
-
-# def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,arch_feat_norm,norm_axis):
-#     variables = (plots,n_archs,state,feature_set,occupations,feature_norm,arch_feat_norm,norm_axis)
-#     if variables not in update_graph_src_dic.keys():
-#         df = Xyzzy(state,X_label = feature_set,socp_shave = occupations, norm = eval(feature_norm)).archetypes(n_archs)
-#         if 'f' in plots:
-#             dfp , ax = df.f , 1
-#         if 'o' in plots:
-#             dfp , ax = df.o.T , 0
-
-#         f = clustermap(dfp)['heatmap']
-#         update_graph_src_dic[variables] = go.Figure(
-#                                 go.Heatmap( z = f.apply(eval(arch_feat_norm),axis = norm_axis).values,
-#                                     y = f.index,
-#                                     x = f.columns
-#                                 ),
-#                     layout = go.Layout(xaxis={'type': 'category'},
-#                                         yaxis={'type': 'category'}
-#                                        )
-#                         )
-            
-    
-#     return update_graph_src_dic[variables]
-
 update_graph_src_dic = {}
 
 @app.callback(
@@ -1083,6 +1073,14 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
     return update_graph_src_dic[variables]
 
 
-    #%%
+
+
+
+#%%
 if __name__ == '__main__':
     app.run_server(host="0.0.0.0", debug=True)
+
+# if __name__ == '__main__':
+#     from wsgiref.simple_server import make_server
+#     srv = make_server('localhost', 8080, app)
+#     srv.serve_forever()
