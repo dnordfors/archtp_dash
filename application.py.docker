@@ -30,10 +30,9 @@ from scipy.linalg import svd
 ## PRESENTATION
 
     ### Graphics
-import matplotlib
-matplotlib.use("Agg")
-#matplotlib.use('TkAgg')         #MacOS
-#import matplotlib.pyplot as plt #MacOs
+import matplotlib               #MacOS https://markhneedham.com/blog/2018/05/04/python-runtime-error-osx-matplotlib-not-installed-as-framework-mac/
+matplotlib.use('TkAgg')         #MacOS
+import matplotlib.pyplot as plt #MacOs
 
 from matplotlib import pyplot as plt
 import seaborn as sns
@@ -827,7 +826,7 @@ class Xyzzy:
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
-application = app.server
+
 app.title = 'Occupational Archetypes'
 
 app.layout = html.Div(
@@ -1087,6 +1086,7 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
     
     return update_graph_src_dic[variables]
 
+
     #%%
 if __name__ == '__main__':
-    app.run_server(port=8080, debug=True)
+    app.run_server(host="0.0.0.0", debug=True)
