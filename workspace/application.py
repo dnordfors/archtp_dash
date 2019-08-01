@@ -823,7 +823,7 @@ class Xyzzy:
 
 
 
-## DASH/PLOTLY  WEB APP3-
+## DASH/PLOTLY  WEB APP
 
 external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
@@ -1006,10 +1006,8 @@ app.layout = html.Div(
                 dcc.Graph(
                     id='example-graph'
                 )
-            ])
-    ], className = "row")
-    ], className='twelve columns'),
-
+            ]),
+        
         dcc.Markdown('''
             #### GOAL FOR THE APP DEVELOPMENT
             
@@ -1303,10 +1301,9 @@ app.layout = html.Div(
                     'fontSize' :18,
                     'text-align':'justify'
                     },
-            ),
-
-        ], className = "row")
-    ], className = "row")
+            )
+    ], className = "row"),
+    ], className='twelve columns')
 )
 
 
@@ -1355,10 +1352,6 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
     
     return update_graph_src_dic[variables]
 
-
-#%% Elastic Beanstalk
-# if __name__ == '__main__':
-#     app.run_server(port=8080, debug=True)
-
-
-
+    #%%
+if __name__ == '__main__':
+    app.run_server(port=8080, debug=True)
