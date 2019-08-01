@@ -1,3 +1,16 @@
+
+# create virtual enviro0nment
+$ pip install virtualenv
+$ cd my-project/
+$ virtualenv venv  # venv can be any name
+$ source venv/bin/activate
+To leave: $ deactivate
+
+
+
+# read and write to s3
+
+
 # aws install git and clone
 sudo yum update -y
 sudo yum install git
