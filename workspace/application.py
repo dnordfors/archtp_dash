@@ -856,10 +856,14 @@ app.layout = html.Div(
                     },
             ),
             
-            html.Div(children='''
+            dcc.Markdown(children='''
+                        **Developer: [David Nordfors](https://www.linkedin.com/in/david-nordfors-ph-d-647798 "LinkedIn profile")** (full stack)
+
                         Archetypes are patterns, i.e. clusters of co-occuring features. The O-net database maps a thousand occupations onto feature sets, such as
                         knowledge, skills and abilities. US Census provides the distributions of occupations within demographies. By combining the two, 
-                        archetypes - clusters of features and occupations - are computed from the data.  
+                        archetypes - clusters of features and occupations - are computed from the data. 
+
+
                         ''',
                     className = 'nine columns')
         ], className = "row"),

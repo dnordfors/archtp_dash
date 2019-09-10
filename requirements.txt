@@ -1,3 +1,4 @@
+scipy
 dash==1.0.0
 dash-daq==0.1.0
 # pandas==0.23.0
