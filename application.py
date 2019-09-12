@@ -265,7 +265,13 @@ class Onet:
         self.zip = zipfile.ZipFile(zip_file)
         self.tocdf = self.make_toc()
         self.socp_titles = self.data('Alternate Titles',socp_shave = 8)[['SOCP_shave','Title']].drop_duplicates()
-
+        self.socp_titles_dic = self.socp_titles.set_index('SOCP_shave').to_dict()['Title']
+        self.socp_keylen = len(list(self.socp_titles_dic.keys())[1])
+     
+    def socp_to_title(self,socp):
+        socp_len = len(socp)
+        socp_x = socp + (self.socp_keylen - socp_len)*'0'
+        return self.socp_titles_dic.get(socp_x,socp_x)
 
     
     def make_toc(self,sep ='.'):
@@ -290,7 +296,6 @@ class Onet:
             search_string = name_contains
             selection = selection[selection['name'].apply(lambda x: search_string.lower() in x.lower())]['name']
         return selection
-         
     
     def data(self,label, socp_shave = 6):
         '''
@@ -815,12 +820,6 @@ class Xyzzy:
 
 
 
-# def clustermap_df(arch):
-#     clusmap = arch.plot_features() # seaborn clustermap object
-#     clus_ind = clusmap.dendrogram_col.data.index[clusmap.dendrogram_col.reordered_ind]
-#     clus_df = clusmap.dendrogram_col.data.reindex(clus_ind) # clustermap as df
-#     return clus_df
-
 
 
 ## DASH/PLOTLY  WEB APP
@@ -927,7 +926,7 @@ app.layout = html.Div(
                                 {'label': 'Cosine Similarity', 'value': 'norm_dot'},
                                 {'label': 'Statistic: Mean = 0, St.Dev. = 1', 'value': 'norm_stat'}
                             ],
-                            value='norm_sum',
+                            value='scale',
                         ) 
                     ],
                     className = 'three columns',
@@ -1337,12 +1336,21 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
     variables = (plots,n_archs,state,feature_set,occupations,feature_norm,arch_feat_norm,norm_axis)
     if variables not in update_graph_src_dic.keys():
         df = Xyzzy(state,X_label = feature_set,socp_shave = occupations, norm = eval(feature_norm)).archetypes(n_archs)
-        if 'f' in plots:
-            dfp , ax = df.f , 1
-        if 'o' in plots:
-            dfp , ax = df.o.T , 0
+        # if 'f' in plots:
+        #     dfp , ax = df.f , 1
+        # if 'o' in plots:
+        #     dfp , ax = df.o.T , 0
+        # # f = clustermap(dfp)['heatmap']
 
-        f = clustermap(dfp)['heatmap']
+        ####  Generate clustered dataframe with Seaborn clustermap() 
+        if 'f' in plots:
+            dfp , ax = df.plot_features() , 1
+        if 'o' in plots:
+            dfx = df.on.copy()
+            dfx.index = dfx.index.map(onet.socp_to_title) 
+            dfp , ax = sns.clustermap(dfx.T), 0
+        f = dfp.data2d
+
         update_graph_src_dic[variables] = go.Figure(
                                 go.Heatmap( z = f.apply(eval(arch_feat_norm),axis = norm_axis).values,
                                     y = f.index,
@@ -1358,4 +1366,4 @@ def update_graph_src(plots,n_archs,state,feature_set,occupations,feature_norm,ar
 
     #%%
 if __name__ == '__main__':
-    app.run_server(port=8080, debug=True)
+    app.run_server(port=8081, debug=True)
